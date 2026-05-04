@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE Message Builder</title>
+    <script src="https://d.line-scdn.net/liff/web-sdk/liff.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00b900;
+            --primary-dark: #008c00;
+            --secondary: #f0f0f0;
+            --text-dark: #111;
+            --text-light: #666;
+            --border-color: #e0e0e0;
+            --success: #34a853;
+            --error: #ea4335;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f5f5 0%, #fafafa 100%);
+            color: var(--text-dark);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px 20px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 185, 0, 0.1);
+        }
+
+        .field-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .field-container.single {
+            grid-template-columns: 1fr;
+        }
+
+        .field-container.triple {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .field-container.quad {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .input-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-wrapper label {
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid var(--secondary);
+        }
+
+        button {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 185, 0, 0.3);
+        }
+
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 185, 0, 0.4);
+        }
+
+        .btn-save {
+            background: #f5f5f5;
+            color: var(--text-dark);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-save:hover {
+            background: #efefef;
+            border-color: var(--text-dark);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .message-preview {
+            background: var(--secondary);
+            border-left: 4px solid var(--primary);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--text-dark);
+            max-height: 200px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .field-fade {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                height: 0;
+            }
+            to {
+                opacity: 1;
+                height: auto;
+            }
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-top: 6px;
+        }
+
+        .emoji {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Message Builder</h1>
+            <p>สร้างและส่ง LINE Message ได้หลายประเภท</p>
+        </div>
+
+        <div class="content">
+            <form id="messageForm">
+                <!-- Message Type Selection -->
+                <div class="form-group">
+                    <label for="messageType"><span class="emoji">📋</span>ประเภท Message</label>
+                    <select id="messageType" required>
+                        <option value="">-- เลือกประเภท --</option>
+                        <option value="text">Text Message</option>
+                        <option value="sticker">Sticker Message</option>
+                        <option value="image">Image Message</option>
+                        <option value="video">Video Message</option>
+                        <option value="audio">Audio Message</option>
+                        <option value="location">Location Message</option>
+                        <option value="template">Template Message</option>
+                        <option value="flex">Flex Message</option>
+                    </select>
+                </div>
+
+                <!-- Text Message Fields -->
+                <div id="textFields" class="form-group hidden field-fade">
+                    <div class="field-container single">
+                        <div class="input-wrapper">
+                            <label for="textMessage">📝 ข้อความ</label>
+                            <input type="text" id="textMessage" placeholder="พิมพ์ข้อความของคุณ">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sticker Message Fields -->
+                <div id="stickerFields" class="form-group hidden field-fade">
+                    <div class="field-container">
+                        <div class="input-wrapper">
+                            <label for="stickerId">🎫 Sticker ID</label>
+                            <input type="text" id="stickerId" placeholder="เช่น 1">
+                            <p class="info-text">ดู ID ที่ <a href="https://developers.line.biz/en/docs/messaging-api/sticker-message/" target="_blank">LINE Docs</a></p>
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="packageId">📦 Package ID</label>
+                            <input type="text" id="packageId" placeholder="เช่น 789">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Message Fields -->
+                <div id="imageFields" class="form-group hidden field-fade">
+                    <div class="field-container">
+                        <div class="input-wrapper">
+                            <label for="imageUrl">🖼️ รูปภาพ URL</label>
+                            <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg">
+                            <p class="info-text">ขนาด: 1024x1024px</p>
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="imageThumbnail">📸 Thumbnail URL</label>
+                            <input type="url" id="imageThumbnail" placeholder="https://example.com/thumb.jpg">
+                            <p class="info-text">ขนาด: 240x240px</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Message Fields -->
+                <div id="videoFields" class="form-group hidden field-fade">
+                    <div class="field-container">
+                        <div class="input-wrapper">
+                            <label for="videoUrl">🎬 วิดีโอ URL</label>
+                            <input type="url" id="videoUrl" placeholder="https://example.com/video.mp4">
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="videoThumbnail">📸 Thumbnail URL</label>
+                            <input type="url" id="videoThumbnail" placeholder="https://example.com/thumb.jpg">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audio Message Fields -->
+                <div id="audioFields" class="form-group hidden field-fade">
+                    <div class="field-container">
+                        <div class="input-wrapper">
+                            <label for="audioUrl">🎵 Audio URL</label>
+                            <input type="url" id="audioUrl" placeholder="https://example.com/audio.m4a">
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="audioDuration">⏱️ ระยะเวลา (ms)</label>
+                            <input type="number" id="audioDuration" placeholder="5000">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location Message Fields -->
+                <div id="locationFields" class="form-group hidden field-fade">
+                    <div class="field-container quad">
+                        <div class="input-wrapper">
+                            <label for="locationTitle">📍 ชื่อที่ตั้ง</label>
+                            <input type="text" id="locationTitle" placeholder="เช่น Bangkok">
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="locationAddress">🏢 ที่อยู่</label>
+                            <input type="text" id="locationAddress" placeholder="เช่น 123 Sukhumvit">
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="locationLatitude">🌍 Latitude</label>
+                            <input type="number" id="locationLatitude" placeholder="13.7563" step="0.0001">
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="locationLongitude">🌍 Longitude</label>
+                            <input type="number" id="locationLongitude" placeholder="100.5018" step="0.0001">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Template Message Fields -->
+                <div id="templateFields" class="form-group hidden field-fade">
+                    <div class="field-container single">
+                        <div class="input-wrapper">
+                            <label for="templateJson">📋 Template JSON</label>
+                            <input type="text" id="templateJson" placeholder='{"type":"buttons","text":"...'}'>
+                            <p class="info-text">วาง JSON ของ Template ที่นี่</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Flex Message Fields -->
+                <div id="flexFields" class="form-group hidden field-fade">
+                    <div class="field-container single">
+                        <div class="input-wrapper">
+                            <label for="flexJson">📋 Flex JSON</label>
+                            <input type="text" id="flexJson" placeholder='{"type":"bubble","body":{...}}'>
+                            <p class="info-text">วาง JSON ของ Flex Message ที่นี่</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Message Preview -->
+                <div id="messagePreview" class="message-preview hidden"></div>
+
+                <!-- Action Buttons -->
+                <div class="button-group">
+                    <button type="button" class="btn-save" id="saveBtn">
+                        💾 บันทึก
+                    </button>
+                    <button type="button" class="btn-send" id="sendBtn">
+                        ✈️ ส่ง
+                    </button>
+                </div>
+
+                <!-- Additional Actions -->
+                <div class="button-group" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                    <button type="button" class="btn-save" id="downloadBtn">
+                        📥 ดาวน์โหลด CSV
+                    </button>
+                    <button type="button" class="btn-save" id="viewBtn">
+                        👁️ ดูข้อมูล
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initialize LIFF
+        const LIFF_ID = '2009969679-yAPqBixm'; // แทนที่ด้วย LIFF ID ของคุณ
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxIunQ4VPauYabrzi7LxnprkRU_1nQ9tV25Ny4Xu-21NTfWGeX8IkLVTmk4NyoBMvqn/exec'; // แทนที่ด้วย Apps Script URL
+
+        let liffInitialized = false;
+
+        // Initialize LIFF
+        window.addEventListener('load', () => {
+            liff.init({
+                liffId: LIFF_ID
+            }).then(() => {
+                liffInitialized = true;
+                console.log('LIFF initialized');
+            }).catch(err => {
+                console.error('LIFF initialization error:', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'ไม่สามารถเริ่มต้น LIFF ได้'
+                });
+            });
+        });
+
+        // Message Type Handler
+        const messageTypeSelect = document.getElementById('messageType');
+        const messageForm = document.getElementById('messageForm');
+
+        messageTypeSelect.addEventListener('change', (e) => {
+            const type = e.target.value;
+            updateFieldVisibility(type);
+            updateMessagePreview();
+        });
+
+        function updateFieldVisibility(type) {
+            // Hide all fields
+            document.querySelectorAll('[id$="Fields"]').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Show selected field
+            if (type) {
+                const fieldId = `${type}Fields`;
+                document.getElementById(fieldId)?.classList.remove('hidden');
+            }
+
+            // Show preview
+            if (type) {
+                document.getElementById('messagePreview').classList.remove('hidden');
+            } else {
+                document.getElementById('messagePreview').classList.add('hidden');
+            }
+        }
+
+        // Update Message Preview
+        function updateMessagePreview() {
+            const type = messageTypeSelect.value;
+            const preview = document.getElementById('messagePreview');
+            let message = {};
+
+            try {
+                switch(type) {
+                    case 'text':
+                        message = {
+                            type: 'text',
+                            text: document.getElementById('textMessage').value || '[ยังไม่ได้กรอก]'
+                        };
+                        break;
+                    case 'sticker':
+                        message = {
+                            type: 'sticker',
+                            stickerId: document.getElementById('stickerId').value || '1',
+                            packageId: document.getElementById('packageId').value || '1'
+                        };
+                        break;
+                    case 'image':
+                        message = {
+                            type: 'image',
+                            originalContentUrl: document.getElementById('imageUrl').value || '[URL]',
+                            previewImageUrl: document.getElementById('imageThumbnail').value || '[URL]'
+                        };
+                        break;
+                    case 'video':
+                        message = {
+                            type: 'video',
+                            originalContentUrl: document.getElementById('videoUrl').value || '[URL]',
+                            previewImageUrl: document.getElementById('videoThumbnail').value || '[URL]'
+                        };
+                        break;
+                    case 'audio':
+                        message = {
+                            type: 'audio',
+                            originalContentUrl: document.getElementById('audioUrl').value || '[URL]',
+                            duration: parseInt(document.getElementById('audioDuration').value) || 0
+                        };
+                        break;
+                    case 'location':
+                        message = {
+                            type: 'location',
+                            title: document.getElementById('locationTitle').value || '[ชื่อ]',
+                            address: document.getElementById('locationAddress').value || '[ที่อยู่]',
+                            latitude: parseFloat(document.getElementById('locationLatitude').value) || 0,
+                            longitude: parseFloat(document.getElementById('locationLongitude').value) || 0
+                        };
+                        break;
+                    case 'template':
+                        const templateJson = document.getElementById('templateJson').value;
+                        message = templateJson ? JSON.parse(templateJson) : { type: 'template', body: {} };
+                        break;
+                    case 'flex':
+                        const flexJson = document.getElementById('flexJson').value;
+                        message = {
+                            type: 'flex',
+                            altText: 'Flex Message',
+                            contents: flexJson ? JSON.parse(flexJson) : { type: 'bubble' }
+                        };
+                        break;
+                }
+
+                preview.textContent = JSON.stringify(message, null, 2);
+                preview.dataset.message = JSON.stringify(message);
+            } catch (error) {
+                preview.textContent = '❌ JSON ไม่ถูกต้อง: ' + error.message;
+                preview.dataset.message = '';
+            }
+        }
+
+        // Input change listeners
+        document.querySelectorAll('input, select').forEach(input => {
+            input.addEventListener('change', updateMessagePreview);
+            input.addEventListener('input', updateMessagePreview);
+        });
+
+        // Save to Google Sheet
+        document.getElementById('saveBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            const messageType = messageTypeSelect.value;
+            if (!messageType) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'เลือกประเภท',
+                    text: 'กรุณาเลือกประเภท Message ก่อน'
+                });
+                return;
+            }
+
+            const messagePreview = document.getElementById('messagePreview');
+            const messageJson = messagePreview.dataset.message;
+
+            if (!messageJson) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อมูลไม่สมบูรณ์',
+                    text: 'กรุณากรอกข้อมูล Message ให้ครบถ้วน'
+                });
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = '⏳ กำลังบันทึก...';
+            saveBtn.disabled = true;
+
+            try {
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'saveMessage',
+                        messageType: messageType,
+                        messageData: messageJson,
+                        timestamp: new Date().toLocaleString('th-TH')
+                    })
+                });
+
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'บันทึกสำเร็จ!',
+                    text: 'Message ได้ถูกบันทึกลง Google Sheet แล้ว',
+                    timer: 2000
+                });
+            } catch (error) {
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'บันทึกไม่สำเร็จ',
+                    text: error.message
+                });
+            }
+        });
+
+        // Send Message via ShareTargetPicker
+        document.getElementById('sendBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            if (!liffInitialized || !liff.isLoggedIn()) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ยังไม่ได้เข้าสู่ระบบ',
+                    text: 'กรุณาเข้าสู่ระบบ LINE ก่อน'
+                });
+                return;
+            }
+
+            const messageType = messageTypeSelect.value;
+            if (!messageType) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'เลือกประเภท',
+                    text: 'กรุณาเลือกประเภท Message ก่อน'
+                });
+                return;
+            }
+
+            const messagePreview = document.getElementById('messagePreview');
+            const messageJson = messagePreview.dataset.message;
+
+            if (!messageJson) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อมูลไม่สมบูรณ์',
+                    text: 'กรุณากรอกข้อมูล Message ให้ครบถ้วน'
+                });
+                return;
+            }
+
+            try {
+                const message = JSON.parse(messageJson);
+                
+                // Open ShareTargetPicker
+                liff.shareTargetPicker([message], {
+                    isMultiple: false
+                }).then(() => {
+                    // Save after successful share
+                    fetch(GOOGLE_APPS_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            action: 'saveMessage',
+                            messageType: messageType,
+                            messageData: messageJson,
+                            timestamp: new Date().toLocaleString('th-TH'),
+                            sent: true
+                        })
+                    });
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ส่งสำเร็จ!',
+                        text: 'Message ถูกส่งไปแล้ว',
+                        timer: 2000
+                    });
+                }).catch(err => {
+                    console.error('Share target error:', err);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'ส่งไม่สำเร็จ',
+                        text: err.message
+                    });
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: error.message
+                });
+            }
+        });
+
+        // Download CSV
+        document.getElementById('downloadBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            const downloadBtn = document.getElementById('downloadBtn');
+            const originalText = downloadBtn.textContent;
+            downloadBtn.textContent = '⏳ กำลังดาวน์โหลด...';
+            downloadBtn.disabled = true;
+
+            try {
+                // สร้าง URL สำหรับ download
+                const downloadUrl = GOOGLE_APPS_SCRIPT_URL.replace('/usercontent', '') + '?action=downloadCSV';
+                
+                // ดาวน์โหลดโดยการเปิด URL
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = 'messages_' + new Date().getTime() + '.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                downloadBtn.textContent = originalText;
+                downloadBtn.disabled = false;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ดาวน์โหลดสำเร็จ!',
+                    text: 'ไฟล์ CSV ถูกดาวน์โหลดแล้ว',
+                    timer: 2000
+                });
+            } catch (error) {
+                downloadBtn.textContent = originalText;
+                downloadBtn.disabled = false;
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ดาวน์โหลดไม่สำเร็จ',
+                    text: error.message
+                });
+            }
+        });
+
+        // View Data
+        document.getElementById('viewBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            const viewBtn = document.getElementById('viewBtn');
+            const originalText = viewBtn.textContent;
+            viewBtn.textContent = '⏳ กำลังโหลด...';
+            viewBtn.disabled = true;
+
+            try {
+                // ดึงข้อมูลจาก Google Sheet
+                const viewUrl = GOOGLE_APPS_SCRIPT_URL.replace('/usercontent', '') + '?action=getAllMessages';
+                
+                const response = await fetch(viewUrl);
+                const data = await response.json();
+
+                viewBtn.textContent = originalText;
+                viewBtn.disabled = false;
+
+                // แสดง modal ด้วย SweetAlert
+                let tableHtml = '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+                tableHtml += '<tr style="background:#00b900; color:white;"><th style="border:1px solid #ddd; padding:8px;">ที่</th><th style="border:1px solid #ddd; padding:8px;">ประเภท</th><th style="border:1px solid #ddd; padding:8px;">ข้อมูล</th><th style="border:1px solid #ddd; padding:8px;">ส่งแล้ว</th></tr>';
+                
+                if (data && data.length > 0) {
+                    data.forEach((msg, index) => {
+                        const messageType = msg.type || 'N/A';
+                        const messageData = typeof msg.data === 'string' ? msg.data : JSON.stringify(msg.data);
+                        const sent = msg.sent || 'ไม่';
+                        const truncated = messageData.substring(0, 50) + (messageData.length > 50 ? '...' : '');
+                        
+                        tableHtml += `<tr style="background:${index % 2 === 0 ? '#f9f9f9' : '#fff'};">`;
+                        tableHtml += `<td style="border:1px solid #ddd; padding:8px;">${index + 1}</td>`;
+                        tableHtml += `<td style="border:1px solid #ddd; padding:8px;">${messageType}</td>`;
+                        tableHtml += `<td style="border:1px solid #ddd; padding:8px; max-width:200px; word-break:break-word;">${truncated}</td>`;
+                        tableHtml += `<td style="border:1px solid #ddd; padding:8px;">${sent}</td>`;
+                        tableHtml += `</tr>`;
+                    });
+                } else {
+                    tableHtml += '<tr><td colspan="4" style="border:1px solid #ddd; padding:8px; text-align:center;">ยังไม่มีข้อมูล</td></tr>';
+                }
+                tableHtml += '</table>';
+
+                Swal.fire({
+                    icon: 'info',
+                    title: 'ข้อมูล Message ที่บันทึก',
+                    html: tableHtml,
+                    width: '90%',
+                    didOpen: () => {
+                        const swalHtml = document.querySelector('.swal2-html-container');
+                        if (swalHtml) swalHtml.style.maxHeight = '400px';
+                        if (swalHtml) swalHtml.style.overflowY = 'auto';
+                    }
+                });
+            } catch (error) {
+                viewBtn.textContent = originalText;
+                viewBtn.disabled = false;
+
+                // ถ้าเป็น no-cors ให้แสดงข้อความแตกต่าง
+                Swal.fire({
+                    icon: 'info',
+                    title: 'ดูข้อมูลจาก Google Sheet',
+                    html: 'เปิด <strong>Google Sheet</strong> ของคุณเพื่อดูข้อมูลที่บันทึกไว้<br><br><small>หากต้องการดูข้อมูลที่นี่ ให้เพิ่ม CORS header ใน Apps Script</small>',
+                    confirmButtonText: 'ตกลง'
+                });
+            }
+        });
+    </script>
+</body>
+</html>
