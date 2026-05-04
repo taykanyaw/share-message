@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LINE Message Builder</title>
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * {
@@ -409,70 +408,140 @@
 
         let liffInitialized = false;
         let liffError = false;
-        let retryCount = 0;
-        const MAX_RETRIES = 20; // 10 วินาที (20 x 500ms)
 
-        // Function to initialize LIFF
-        function initializeLIFF() {
-            // Check if liff object is available
-            if (typeof liff === 'undefined') {
-                retryCount++;
-                
-                if (retryCount >= MAX_RETRIES) {
-                    liffError = true;
-                    console.error('❌ LIFF SDK ไม่สามารถโหลดได้หลังพยายาม ' + MAX_RETRIES + ' ครั้ง');
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'ไม่สามารถโหลด LIFF SDK',
-                        html: `
-                            <p>LIFF SDK ไม่สามารถโหลดได้</p>
-                            <p style="color:#666; font-size:12px;">สาเหตุที่เป็นไปได้:</p>
-                            <ul style="text-align:left; font-size:12px; color:#666;">
-                                <li>ปัญหาการเชื่อมต่อเครือข่าย</li>
-                                <li>Browser block CDN</li>
-                                <li>SDK URL ไม่ถูกต้อง</li>
-                            </ul>
-                            <p style="font-size:12px;">กรุณา <strong>Refresh</strong> หน้านี้</p>
-                        `,
-                        confirmButtonText: 'Refresh',
-                        showCancelButton: true,
-                        cancelButtonText: 'ปิด'
-                    }).then(result => {
-                        if (result.isConfirmed) {
-                            location.reload();
-                        }
-                    });
+        // โหลด LIFF SDK แบบ Promise-based
+        function loadLiffSDK() {
+            return new Promise((resolve, reject) => {
+                // ถ้า liff โหลดอยู่แล้ว (กรณี cached)
+                if (typeof liff !== 'undefined') {
+                    console.log('✓ LIFF SDK already loaded');
+                    resolve();
                     return;
                 }
+
+                console.log('⏳ กำลังโหลด LIFF SDK...');
+                const script = document.createElement('script');
+                script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+                script.charset = 'utf-8';
                 
-                console.warn(`⏳ LIFF SDK ยังไม่พร้อม รอสักครู่... (${retryCount}/${MAX_RETRIES})`);
-                // Retry after 500ms
-                setTimeout(initializeLIFF, 500);
-                return;
-            }
+                // Timeout 15 seconds
+                const timeoutId = setTimeout(() => {
+                    reject(new Error('LIFF SDK load timeout (15s)'));
+                }, 15000);
 
-            console.log('✓ LIFF SDK พร้อม');
+                script.onload = () => {
+                    clearTimeout(timeoutId);
+                    console.log('✓ LIFF SDK loaded successfully');
+                    resolve();
+                };
 
-            liff.init({
-                liffId: LIFF_ID
-            }).then(() => {
+                script.onerror = () => {
+                    clearTimeout(timeoutId);
+                    reject(new Error('Failed to load LIFF SDK from CDN'));
+                };
+
+                document.head.appendChild(script);
+            });
+        }
+
+        // Initialize LIFF App
+        async function initializeLIFF() {
+            try {
+                // 1. โหลด LIFF SDK ก่อน
+                await loadLiffSDK();
+
+                // 2. ตรวจสอบว่า liff object มีจริง (double check)
+                if (typeof liff === 'undefined') {
+                    throw new Error('LIFF SDK loaded but liff object is undefined');
+                }
+
+                // 3. Initialize LIFF
+                await liff.init({ liffId: LIFF_ID });
+                
                 liffInitialized = true;
                 console.log('✓ LIFF initialized successfully');
-                if (liff.isLoggedIn()) {
-                    console.log('✓ User is logged in');
-                } else {
-                    console.log('⚠ User is not logged in');
+
+                // 4. ตรวจสอบสภาพแวดล้อม
+                const isInClient = liff.isInClient();
+                const isLoggedIn = liff.isLoggedIn();
+                
+                console.log('Environment:', isInClient ? '📱 LINE App' : '🌐 External Browser');
+                console.log('Login status:', isLoggedIn ? '✓ Logged in' : '⚠ Not logged in');
+
+                // 5. ถ้าอยู่ใน External Browser และยังไม่ login → บังคับ login
+                if (!isInClient && !isLoggedIn) {
+                    console.log('🔐 กำลังนำไปยังหน้า LINE Login...');
+                    
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'กรุณาเข้าสู่ระบบ LINE',
+                        text: 'คุณจะถูกนำไปยังหน้า LINE Login',
+                        showCancelButton: true,
+                        confirmButtonText: 'เข้าสู่ระบบ',
+                        cancelButtonText: 'ยกเลิก',
+                        allowOutsideClick: false
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            liff.login({
+                                redirectUri: window.location.href
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'ยังไม่ได้เข้าสู่ระบบ',
+                                html: '<p>คุณจะไม่สามารถส่งข้อความได้</p><p style="font-size:12px; color:#666;">หากต้องการใช้งาน กรุณา Refresh แล้วเข้าสู่ระบบ</p>',
+                                confirmButtonText: 'ตกลง'
+                            });
+                        }
+                    });
+                } else if (isLoggedIn) {
+                    console.log('✓ User is ready to use the app');
                 }
-            }).catch(err => {
+
+            } catch (error) {
                 liffError = true;
-                console.error('❌ LIFF initialization error:', err);
+                console.error('❌ LIFF initialization error:', error);
+                
+                // กำหนดข้อความ error ให้เหมาะสม
+                let errorTitle = 'เกิดข้อผิดพลาด';
+                let errorHtml = '';
+                
+                if (error.message && error.message.includes('Failed to load LIFF SDK')) {
+                    errorTitle = 'ไม่สามารถโหลด LIFF SDK';
+                    errorHtml = `
+                        <p>ไม่สามารถโหลด LIFF SDK จาก CDN</p>
+                        <p style="color:#666; font-size:12px;">สาเหตุที่เป็นไปได้:</p>
+                        <ul style="text-align:left; font-size:12px; color:#666;">
+                            <li>ปัญหาการเชื่อมต่อเครือข่าย</li>
+                            <li>Browser block CDN</li>
+                            <li>Firewall ปิดกั้น static.line-scdn.net</li>
+                        </ul>
+                    `;
+                } else if (error.message && error.message.includes('timeout')) {
+                    errorTitle = 'หมดเวลาการโหลด';
+                    errorHtml = '<p>การโหลด LIFF SDK ใช้เวลานานเกินไป</p><p style="font-size:12px; color:#666;">กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต</p>';
+                } else {
+                    errorHtml = `
+                        <p>ไม่สามารถเริ่มต้น LIFF ได้</p>
+                        <p style="color:#666; font-size:12px;">LIFF ID: <code>${LIFF_ID}</code></p>
+                        <p style="color:#666; font-size:12px;">ตรวจสอบว่า LIFF ID ถูกต้องหรือไม่</p>
+                        <p style="color:#666; font-size:12px;">Error: ${error.message || 'Unknown error'}</p>
+                    `;
+                }
+
                 Swal.fire({
                     icon: 'error',
-                    title: 'เกิดข้อผิดพลาด',
-                    html: `<p>ไม่สามารถเริ่มต้น LIFF ได้</p><p style="color:#666; font-size:12px;">LIFF ID: <code>${LIFF_ID}</code></p><p style="color:#666; font-size:12px;">ตรวจสอบว่า LIFF ID ถูกต้องหรือไม่</p>`,
-                    confirmButtonText: 'ตกลง'
+                    title: errorTitle,
+                    html: errorHtml,
+                    showCancelButton: true,
+                    confirmButtonText: 'Refresh',
+                    cancelButtonText: 'ปิด'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        location.reload();
+                    }
                 });
-            });
+            }
         }
 
         // Initialize LIFF when document is ready
@@ -691,10 +760,20 @@
             }
 
             if (!liff.isLoggedIn()) {
+                // ถ้ายังไม่ login ให้แสดง dialog เพื่อ login
                 Swal.fire({
                     icon: 'warning',
                     title: 'ยังไม่ได้เข้าสู่ระบบ',
-                    text: 'กรุณาเข้าสู่ระบบ LINE ก่อน'
+                    text: 'คุณต้องเข้าสู่ระบบ LINE ก่อนจึงจะส่งข้อความได้',
+                    showCancelButton: true,
+                    confirmButtonText: 'เข้าสู่ระบบ',
+                    cancelButtonText: 'ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        liff.login({
+                            redirectUri: window.location.href
+                        });
+                    }
                 });
                 return;
             }
