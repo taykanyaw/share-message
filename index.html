@@ -408,23 +408,48 @@
         const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxIunQ4VPauYabrzi7LxnprkRU_1nQ9tV25Ny4Xu-21NTfWGeX8IkLVTmk4NyoBMvqn/exec'; // แทนที่ด้วย Apps Script URL
 
         let liffInitialized = false;
+        let liffError = false;
 
-        // Initialize LIFF
-        window.addEventListener('load', () => {
+        // Function to initialize LIFF
+        function initializeLIFF() {
+            // Check if liff object is available
+            if (typeof liff === 'undefined') {
+                console.warn('⏳ LIFF SDK ยังไม่พร้อม รอสักครู่...');
+                // Retry after 500ms
+                setTimeout(initializeLIFF, 500);
+                return;
+            }
+
+            console.log('✓ LIFF SDK พร้อม');
+
             liff.init({
                 liffId: LIFF_ID
             }).then(() => {
                 liffInitialized = true;
-                console.log('LIFF initialized');
+                console.log('✓ LIFF initialized successfully');
+                if (liff.isLoggedIn()) {
+                    console.log('✓ User is logged in');
+                } else {
+                    console.log('⚠ User is not logged in');
+                }
             }).catch(err => {
-                console.error('LIFF initialization error:', err);
+                liffError = true;
+                console.error('❌ LIFF initialization error:', err);
                 Swal.fire({
                     icon: 'error',
                     title: 'เกิดข้อผิดพลาด',
-                    text: 'ไม่สามารถเริ่มต้น LIFF ได้'
+                    html: `<p>ไม่สามารถเริ่มต้น LIFF ได้</p><p style="color:#666; font-size:12px;">LIFF ID: <code>${LIFF_ID}</code></p><p style="color:#666; font-size:12px;">ตรวจสอบว่า LIFF ID ถูกต้องหรือไม่</p>`,
+                    confirmButtonText: 'ตกลง'
                 });
             });
-        });
+        }
+
+        // Initialize LIFF when document is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeLIFF);
+        } else {
+            initializeLIFF();
+        }
 
         // Message Type Handler
         const messageTypeSelect = document.getElementById('messageType');
@@ -606,9 +631,37 @@
         document.getElementById('sendBtn').addEventListener('click', async (e) => {
             e.preventDefault();
 
-            if (!liffInitialized || !liff.isLoggedIn()) {
+            // Check if LIFF is initialized
+            if (liffError) {
                 Swal.fire({
                     icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: 'ไม่สามารถส่งข้อความได้ เนื่องจาก LIFF ไม่ทำงาน'
+                });
+                return;
+            }
+
+            if (!liffInitialized) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กำลังเตรียมแอป',
+                    text: 'กรุณารอสักครู่...'
+                });
+                return;
+            }
+
+            if (typeof liff === 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'LIFF SDK ไม่สามารถใช้งานได้ กรุณา Refresh หน้านี้'
+                });
+                return;
+            }
+
+            if (!liff.isLoggedIn()) {
+                Swal.fire({
+                    icon: 'warning',
                     title: 'ยังไม่ได้เข้าสู่ระบบ',
                     text: 'กรุณาเข้าสู่ระบบ LINE ก่อน'
                 });
@@ -691,7 +744,7 @@
 
             try {
                 // สร้าง URL สำหรับ download
-                const downloadUrl = GOOGLE_APPS_SCRIPT_URL.replace('/usercontent', '') + '?action=downloadCSV';
+                const downloadUrl = GOOGLE_APPS_SCRIPT_URL.replace('/exec', '') + '?action=downloadCSV';
                 
                 // ดาวน์โหลดโดยการเปิด URL
                 const link = document.createElement('a');
@@ -733,7 +786,7 @@
 
             try {
                 // ดึงข้อมูลจาก Google Sheet
-                const viewUrl = GOOGLE_APPS_SCRIPT_URL.replace('/usercontent', '') + '?action=getAllMessages';
+                const viewUrl = GOOGLE_APPS_SCRIPT_URL.replace('/exec', '') + '?action=getAllMessages';
                 
                 const response = await fetch(viewUrl);
                 const data = await response.json();
