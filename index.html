@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LINE Message Builder</title>
-    <script src="https://d.line-scdn.net/liff/web-sdk/liff.js"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * {
@@ -409,12 +409,43 @@
 
         let liffInitialized = false;
         let liffError = false;
+        let retryCount = 0;
+        const MAX_RETRIES = 20; // 10 วินาที (20 x 500ms)
 
         // Function to initialize LIFF
         function initializeLIFF() {
             // Check if liff object is available
             if (typeof liff === 'undefined') {
-                console.warn('⏳ LIFF SDK ยังไม่พร้อม รอสักครู่...');
+                retryCount++;
+                
+                if (retryCount >= MAX_RETRIES) {
+                    liffError = true;
+                    console.error('❌ LIFF SDK ไม่สามารถโหลดได้หลังพยายาม ' + MAX_RETRIES + ' ครั้ง');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'ไม่สามารถโหลด LIFF SDK',
+                        html: `
+                            <p>LIFF SDK ไม่สามารถโหลดได้</p>
+                            <p style="color:#666; font-size:12px;">สาเหตุที่เป็นไปได้:</p>
+                            <ul style="text-align:left; font-size:12px; color:#666;">
+                                <li>ปัญหาการเชื่อมต่อเครือข่าย</li>
+                                <li>Browser block CDN</li>
+                                <li>SDK URL ไม่ถูกต้อง</li>
+                            </ul>
+                            <p style="font-size:12px;">กรุณา <strong>Refresh</strong> หน้านี้</p>
+                        `,
+                        confirmButtonText: 'Refresh',
+                        showCancelButton: true,
+                        cancelButtonText: 'ปิด'
+                    }).then(result => {
+                        if (result.isConfirmed) {
+                            location.reload();
+                        }
+                    });
+                    return;
+                }
+                
+                console.warn(`⏳ LIFF SDK ยังไม่พร้อม รอสักครู่... (${retryCount}/${MAX_RETRIES})`);
                 // Retry after 500ms
                 setTimeout(initializeLIFF, 500);
                 return;
